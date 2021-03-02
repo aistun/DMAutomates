@@ -200,18 +200,14 @@ let compile_types tlist init pp =
             List.fold_left (fun tr v ->
                 let label = StringMap.find m lmap in
                 let qt    = StringMap.find m qmap in
-                if not (StringSet.mem v a.final) then
-                  TreeAutomaton.TransitionMap.add
-                    u
-                    ((label, qt , v) ::
-                     (try TreeAutomaton.TransitionMap.find u tr with Not_found -> []))
-                    tr
-                else
-                  TreeAutomaton.TransitionMap.add
-                    u
-                    ((label, qt , "#") :: (label, qt, v) ::
-                     (try TreeAutomaton.TransitionMap.find u tr with Not_found -> []))
-                    tr
+                let lst   =
+                  try TreeAutomaton.TransitionMap.find u tr with Not_found -> [] in
+                TreeAutomaton.TransitionMap.add
+                  u
+                  ((label, qt, v) ::
+                   if StringSet.mem v a.final then (label, qt, "#") :: lst
+                   else lst)
+                  tr
               ) tr vl
           ) a.transitions tr in
       (StringSet.union a.states q, tr)
