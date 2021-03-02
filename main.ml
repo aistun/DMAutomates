@@ -3,8 +3,8 @@
 
 open Types
 open Format
-open Automaton
-(* open TreeAutomaton *)
+(* open Automaton
+ * open TreeAutomaton *)
 open Compile
 
 let rec pp_alt f = function
@@ -46,7 +46,9 @@ let () =
     List.iter (fun t -> print_type_def t) tlist;
     List.iter (fun t ->
         let _ = compile_label t.label in ()) tlist;
-    let init = new_state () in
-    let automaton = compile_regexp init (List.hd tlist).regexp in
-    printf "%a@." pp_automaton automaton
+    (* let init = new_state () in
+     * let a = compile_regexp init (List.hd tlist).regexp in
+     * printf "%a@." Automaton.pp a; *)
+    let ta = compile_types tlist (List.hd tlist).id pp_tdef in
+    printf "%a@." TreeAutomaton.pp ta
   end

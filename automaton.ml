@@ -28,8 +28,10 @@ type automaton = {
   transitions: transitions
 }
 
-let pp_string_set f =
-  StringSet.iter (fun x -> fprintf f "%s " x)
+let pp_string_set f s =
+  if StringSet.cardinal s = 0 then fprintf f "{}"
+  else
+    StringSet.iter (fun x -> fprintf f "%s " x) s
 
 let pp_transition_list indent q a f =
   List.iter (fun x -> fprintf f "%s%s -%s-> %s\n" indent q a x)
@@ -37,7 +39,7 @@ let pp_transition_list indent q a f =
 let pp_transition_map indent f =
   TransitionMap.iter (fun (q, a) q'list -> fprintf f "%a" (pp_transition_list indent q a) q'list)
 
-let pp_automaton f a =
+let pp f a =
   let pps = pp_string_set in
   let ppt = pp_transition_map "\t\t" in
   fprintf f "Automaton :

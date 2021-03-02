@@ -19,19 +19,23 @@ let fusion l =
 let compile_label = function
   | Ident s  -> Finite (StringSet.singleton s)
   | Any      -> CoFinite StringSet.empty
-  | AllBut l -> CoFinite (StringSet.of_list l)
+  | AllBut l ->
+    Format.printf "COFINITE %d@." (List.length l);
+    CoFinite (StringSet.of_list l)
 
-let new_state =
+let new_state, reset_state =
   let n = ref 0 in
-  fun () ->
+  (fun () ->
     incr n;
-    string_of_int !n
+    string_of_int !n),
+  (fun () -> n := 0)
 
-let new_int =
+let new_int, reset_int =
   let n = ref 0 in
-  fun () ->
+  (fun () ->
     incr n;
-    !n
+    !n),
+  (fun () -> n := 0)
 
 module IntSet = Set.Make(struct
     type t = int
@@ -74,6 +78,7 @@ let linear_regexp_of_regexp r =
       let back', r1' = aux back r1 in
       let back'', r2' = aux back' r2 in
       back'', LAlt(r1', r2') in
+  reset_int ();
   aux IntMap.empty r
 
 let rec recognize_epsilon = function
@@ -126,6 +131,11 @@ let rec nb_states = function
   | LConcat(r1, r2)
   | LAlt(r1, r2)    -> nb_states r1 + nb_states r2
 
+(**
+ * Construction du NFA correspondant à l'expression régulière r et ayant
+ * pour unique état initial `init`.
+ * J'utilise ici la constructon de Glushkov.
+ *)
 let compile_regexp init r =
   let back, lr = linear_regexp_of_regexp r in
   let n = nb_states lr in
@@ -150,8 +160,7 @@ let compile_regexp init r =
          (try Automaton.TransitionMap.find key tr with Not_found -> []))
         tr)
       fac initial_transitions in
-  let initial = IntSet.fold (fun x s ->
-      StringSet.add states_arr.(x) s) f StringSet.empty in
+  let initial = StringSet.singleton init in
   let final   = IntSet.fold (fun x s ->
       StringSet.add states_arr.(x) s) l StringSet.empty in
   let states  = Array.fold_left (fun s x ->
@@ -162,3 +171,54 @@ let compile_regexp init r =
     final   = final;
     transitions = transitions
   } : Automaton.automaton)
+
+module StringMap = Map.Make(String)
+
+(* TODO :
+   - clear les états vers lesquels on ne peut pas réduire
+   - regrouper les déclarations multiples d'un même type avec le | *)
+
+let compile_types tlist init pp =
+  let q, qmap, lmap = List.fold_left (fun (q, qmap, lmap) t ->
+      let qt = "q" ^ t.id in
+      let lt = compile_label t.label in
+      StringSet.add qt q, StringMap.add t.id qt qmap, StringMap.add t.id lt lmap
+    ) (StringSet.empty, StringMap.empty, StringMap.empty) tlist in
+  let q, qmap = List.fold_left (fun (q, qmap) t ->
+      let qt = StringMap.find t.id qmap in
+      if t.regexp = Empty then
+        (StringSet.remove qt q, StringMap.add t.id "#" qmap)
+      else
+        (q, qmap)
+    ) (q, qmap) tlist in
+  let q', tr = List.fold_left (fun (q, tr) t ->
+      Format.printf "%a@." pp t;
+      let a = compile_regexp (StringMap.find t.id qmap) t.regexp in
+      Format.printf "%a@." Automaton.pp a;
+      let tr =
+        Automaton.TransitionMap.fold (fun (u, m) vl tr ->
+            List.fold_left (fun tr v ->
+                let label = StringMap.find m lmap in
+                let qt    = StringMap.find m qmap in
+                if not (StringSet.mem v a.final) then
+                  TreeAutomaton.TransitionMap.add
+                    u
+                    ((label, qt , v) ::
+                     (try TreeAutomaton.TransitionMap.find u tr with Not_found -> []))
+                    tr
+                else
+                  TreeAutomaton.TransitionMap.add
+                    u
+                    ((label, qt , "#") :: (label, qt, v) ::
+                     (try TreeAutomaton.TransitionMap.find u tr with Not_found -> []))
+                    tr
+              ) tr vl
+          ) a.transitions tr in
+      (StringSet.union a.states q, tr)
+    ) (q, TreeAutomaton.TransitionMap.empty) tlist in
+  let qinit = StringMap.find init qmap in
+  let linit = StringMap.find init lmap in
+  { states = StringSet.add "accept" (StringSet.add "#" q');
+    initial = StringSet.singleton (StringMap.find init qmap);
+    final = StringSet.empty;
+    transitions = TreeAutomaton.TransitionMap.add "accept" [(linit, qinit, "#")] tr}
