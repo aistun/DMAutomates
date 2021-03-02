@@ -1,40 +1,6 @@
 open Types
 open TreeAutomaton
 
-(* inutile finalement car les exclusions d'étiquettes sont des chaines de
- * de caractères *)
-let fusion l =
-  List.fold_left (fun (finite, cofinite) x ->
-      match finite, cofinite, x with
-      | None, s, (Finite _ as sf) ->
-        (Some sf, s)
-      | s, None, (CoFinite _ as scof) ->
-        (s, Some scof)
-      | Some (Finite ef), s, Finite e ->
-        Some (Finite (StringSet.union ef e)), s
-      | s, Some (CoFinite ecof), CoFinite e ->
-        s, Some (CoFinite (StringSet.inter ecof e))
-      | _ -> assert false) (None, None) l
-
-let compile_label = function
-  | Ident s  -> Finite (StringSet.singleton s)
-  | Any      -> CoFinite StringSet.empty
-  | AllBut l -> CoFinite (StringSet.of_list l)
-
-let new_state, reset_state =
-  let n = ref 0 in
-  (fun () ->
-    incr n;
-    string_of_int !n),
-  (fun () -> n := 0)
-
-let new_int, reset_int =
-  let n = ref 0 in
-  (fun () ->
-    incr n;
-    !n),
-  (fun () -> n := 0)
-
 module IntSet = Set.Make(struct
     type t = int
     let compare = compare
@@ -55,6 +21,27 @@ module IntInt = struct
 end
 
 module IntIntSet = Set.Make(IntInt)
+
+module StringMap = Map.Make(String)
+
+let new_state, reset_state =
+  let n = ref 0 in
+  (fun () ->
+    incr n;
+    string_of_int !n),
+  (fun () -> n := 0)
+
+let new_int, reset_int =
+  let n = ref 0 in
+  (fun () ->
+    incr n;
+    !n),
+  (fun () -> n := 0)
+
+let compile_label = function
+  | Ident s  -> Finite (StringSet.singleton s)
+  | Any      -> CoFinite StringSet.empty
+  | AllBut l -> CoFinite (StringSet.of_list l)
 
 let linear_regexp_of_regexp r =
   let rec aux back = function
@@ -79,12 +66,14 @@ let linear_regexp_of_regexp r =
   reset_int ();
   aux IntMap.empty r
 
+(* Renvoie true si la regexp permet de reconnaître epsilon. *)
 let rec recognize_epsilon = function
   | LQMark _ | LStar _ -> true
   | LConcat(r1, _) -> recognize_epsilon r1
   | LAlt(r1, r2) -> recognize_epsilon r1 || recognize_epsilon r2
   | _ -> false
 
+(* Premiers éléments atomiques possibles dans les mots reconnus par la regexp. *)
 let rec first = function
   | LEmpty      -> IntSet.empty
   | LAtom(_, i) -> IntSet.singleton i
@@ -95,6 +84,7 @@ let rec first = function
     else first r1
   | LAlt(r1, r2)    -> IntSet.union (first r1) (first r2)
 
+(* Derniers éléments atomiques possibles dans les mots reconnus par la regexp. *)
 let rec last = function
   | LEmpty      -> IntSet.empty
   | LAtom(_, i) -> IntSet.singleton i
@@ -105,6 +95,7 @@ let rec last = function
     else last r2
   | LAlt(r1, r2)    -> IntSet.union (last r1) (last r2)
 
+(* Produit cartésien de deux ensembles d'entiers. *)
 let prod s1 s2 =
   IntSet.fold (fun x1 s ->
       IntSet.fold (fun x2 s ->
@@ -169,8 +160,6 @@ let compile_regexp init r =
     final   = final;
     transitions = transitions
   } : Automaton.automaton)
-
-module StringMap = Map.Make(String)
 
 let clear states transitions =
   let remove =
