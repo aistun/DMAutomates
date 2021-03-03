@@ -27,6 +27,14 @@ type type_def = {
   regexp: regexp
 }
 
+module StringSet = Set.Make(String)
+module StringMap = Map.Make(String)
+
+type alphabet = StringSet.t
+type state  = string
+type states = StringSet.t
+
+
 (* module MapList(Ord : OrderedType) : sig
  *   type 'a t
  *   let add :  *)

@@ -1,11 +1,7 @@
 open Format
+open Types
 open Tree
-
-module StringSet = Set.Make(String)
-
-type alphabet = StringSet.t
-type state  = string
-type states = StringSet.t
+(* open Utils *)
 
 type labelset =
   | Finite of alphabet

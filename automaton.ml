@@ -1,10 +1,5 @@
 open Format
-
-module StringSet = Set.Make(String)
-
-type alphabet = StringSet.t
-type state  = string
-type states = StringSet.t
+open Types
 
 type transition_key = state * string
 type transition_values = state

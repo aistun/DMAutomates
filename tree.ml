@@ -1,11 +1,10 @@
 open Format
+open Types
 open Xml
 
 type 'a binary_tree =
   | Empty
   | Node of 'a * 'a binary_tree * 'a binary_tree
-
-module StringMap = Map.Make(String)
 
 type binary_tree_map = string StringMap.t
 
