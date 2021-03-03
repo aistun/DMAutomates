@@ -23,9 +23,6 @@ type_def:
 label:
 | id = IDENT                              { Types.Ident id }
 | STAR                                    { Types.Any      }
-(* inutile car finalement les exclusions d'étiquettes sont des chaînes de
- * caractères *)
-(* | LPAR; l = label; RPAR                   { l } *)
 | TILDE; l = separated_list(TILDE, IDENT) { Types.AllBut l }
 
 regexp_base:
