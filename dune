@@ -2,4 +2,5 @@
 (menhir
   (modules parser))
 (executable
-  (name main))
+  (name main)
+  (libraries xml-light))
