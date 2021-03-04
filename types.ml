@@ -57,12 +57,6 @@ end
 module IntIntSet = Set.Make(IntInt)
 module StringListMap = ListMap(String)
 
-
-(* module MapList(Ord : OrderedType) : sig
- *   type 'a t
- *   let add :  *)
-
-
 let rec pp_alt f = function
   | Alt(r1, r2) -> fprintf f "%a | %a" pp_alt r1 pp_alt r2
   | _ as r     -> fprintf f "%a" pp_concat r
