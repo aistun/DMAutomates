@@ -1,5 +1,6 @@
 open Format
 open Types
+open Utils
 
 type transition_key = state * string
 type transition_values = state
@@ -13,8 +14,8 @@ module TransitionKey = struct
     else 1
 end
 
-module TransitionMap = Map.Make(TransitionKey)
-type transitions = (transition_values list) TransitionMap.t
+module TransitionMap = ListMap(TransitionKey)
+type transitions = transition_values TransitionMap.t
 
 type automaton = {
   states: states;
@@ -32,7 +33,7 @@ let pp_transition_list indent q a f =
   List.iter (fun x -> fprintf f "%s%s -%s-> %s\n" indent q a x)
 
 let pp_transition_map indent f =
-  TransitionMap.iter (fun (q, a) q'list -> fprintf f "%a" (pp_transition_list indent q a) q'list)
+  TransitionMap.iter_map (fun (q, a) q'list -> fprintf f "%a" (pp_transition_list indent q a) q'list)
 
 let pp f a =
   let pps = pp_string_set in

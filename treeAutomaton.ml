@@ -1,7 +1,7 @@
 open Format
 open Types
 open Tree
-(* open Utils *)
+open Utils
 
 type labelset =
   | Finite of alphabet
@@ -10,8 +10,8 @@ type labelset =
 type transition_key = state
 type transition_values = labelset * state * state
 
-module TransitionMap = Map.Make(String)
-type transitions = (transition_values list) TransitionMap.t
+module TransitionMap = ListMap(String)
+type transitions = transition_values TransitionMap.t
 
 type tree_automaton = {
   states: states;
@@ -32,7 +32,7 @@ let pp_transition_list indent q f =
       | CoFinite s -> fprintf f "%s CO %a, %s --> %s, %s\n" indent pp_string_set s q q1 q2)
 
 let pp_transition_map indent f =
-  TransitionMap.iter (fun q q'list -> fprintf f "%a" (pp_transition_list indent q) q'list)
+  TransitionMap.iter_map (fun q q'list -> fprintf f "%a" (pp_transition_list indent q) q'list)
 
 let pp f (a : tree_automaton) =
   let pps = pp_string_set in
@@ -59,8 +59,9 @@ let rec validate_bu (a : tree_automaton) (t : binary_tree_map) (p : string) =
   else
     let r1 = validate_bu a t (p ^ "1") in
     let r2 = validate_bu a t (p ^ "2") in
-    TransitionMap.fold (fun q tr r ->
-        List.fold_left (fun r (labels, q1, q2) ->
+    (* TransitionMap.fold (fun q tr r ->
+     *     List.fold_left (fun r (labels, q1, q2) -> *)
+    TransitionMap.fold (fun q (labels, q1, q2) r ->
             match labels with
             | Finite s ->
               if StringSet.mem q1 r1 && StringSet.mem q2 r2 && StringSet.mem tp s then
@@ -70,7 +71,6 @@ let rec validate_bu (a : tree_automaton) (t : binary_tree_map) (p : string) =
               if StringSet.mem q1 r1 && StringSet.mem q2 r2 && not (StringSet.mem tp s) then
                 StringSet.add q r
               else r
-          ) r tr
       ) a.transitions StringSet.empty
 
 let rec validate_opt (a : tree_automaton) (t: binary_tree_map) (p : string) (c : states) =
@@ -79,8 +79,9 @@ let rec validate_opt (a : tree_automaton) (t: binary_tree_map) (p : string) (c :
   else if StringSet.mem "#" c then StringSet.singleton "#"
   else
     let c', c1, c2 =
-      TransitionMap.fold (fun q tr (c', c1, c2) ->
-          List.fold_left (fun (c', c1, c2) (labels, q1, q2) ->
+      (* TransitionMap.fold (fun q tr (c', c1, c2) ->
+       *     List.fold_left (fun (c', c1, c2) (labels, q1, q2) -> *)
+      TransitionMap.fold (fun q (labels, q1, q2) (c', c1, c2) ->
               match labels with
               | Finite s ->
                 if StringSet.mem q c && StringSet.mem tp s then
@@ -92,16 +93,17 @@ let rec validate_opt (a : tree_automaton) (t: binary_tree_map) (p : string) (c :
                   (StringSet.add q c', StringSet.add q1 c1, StringSet.add q2 c2)
                 else
                   (c', c1, c2)
-            ) (c', c1, c2) tr
+            (* ) (c', c1, c2) tr *)
         ) a.transitions (StringSet.empty, StringSet.empty, StringSet.empty) in
     let r1 = validate_opt a t (p ^ "1") c1 in
     let r2 = validate_opt a t (p ^ "2") c2 in
     if StringSet.is_empty r1 || StringSet.is_empty r2 then StringSet.empty
     else
-      TransitionMap.fold (fun q tr r ->
-          List.fold_left (fun r (_, q1, q2) ->
+      (* TransitionMap.fold (fun q tr r ->
+       *     List.fold_left (fun r (_, q1, q2) -> *)
+      TransitionMap.fold (fun q (_, q1, q2) r ->
               if StringSet.mem q c' && StringSet.mem q1 r1 && StringSet.mem q2 r2 then
                 StringSet.add q r
               else r
-            ) r tr
+            (* ) r tr *)
         ) a.transitions StringSet.empty

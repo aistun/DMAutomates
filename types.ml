@@ -1,4 +1,5 @@
 open Format
+open Utils
 
 type regexp =
   | Empty
@@ -33,6 +34,28 @@ module StringMap = Map.Make(String)
 type alphabet = StringSet.t
 type state  = string
 type states = StringSet.t
+
+module IntSet = Set.Make(struct
+    type t = int
+    let compare = compare
+  end)
+
+module IntMap = Map.Make(struct
+    type t = int
+    let compare = compare
+  end)
+
+module IntInt = struct
+  type t = int * int
+  let compare (a1, a2) (b1, b2) =
+    if a1 < b1 then -1
+    else if a1 = b1 && a2 < b2 then -1
+    else if a1 = b1 && a2 = b2 then 0
+    else 1
+end
+
+module IntIntSet = Set.Make(IntInt)
+module StringListMap = ListMap(String)
 
 
 (* module MapList(Ord : OrderedType) : sig

@@ -1,28 +1,8 @@
 open Types
 open TreeAutomaton
 
-module IntSet = Set.Make(struct
-    type t = int
-    let compare = compare
-  end)
-
-module IntMap = Map.Make(struct
-    type t = int
-    let compare = compare
-  end)
-
-module IntInt = struct
-  type t = int * int
-  let compare (a1, a2) (b1, b2) =
-    if a1 < b1 then -1
-    else if a1 = b1 && a2 < b2 then -1
-    else if a1 = b1 && a2 = b2 then 0
-    else 1
-end
-
-module IntIntSet = Set.Make(IntInt)
-
-module StringMap = Map.Make(String)
+module TreeATrMap = TreeAutomaton.TransitionMap
+module ATrMap = Automaton.TransitionMap
 
 let new_state, reset_state =
   let n = ref 0 in
@@ -135,20 +115,22 @@ let compile_regexp init r =
   let fac = factors lr in
   let initial_transitions = IntSet.fold (fun x tr ->
       let key = init, IntMap.find x back in
-      Automaton.TransitionMap.add
-        key
-        (states_arr.(x) ::
-         (try Automaton.TransitionMap.find key tr with Not_found -> []))
-        tr)
-      f Automaton.TransitionMap.empty in
+      (* Automaton.TransitionMap.add
+       *   key
+       *   (states_arr.(x) ::
+       *    (try Automaton.TransitionMap.find key tr with Not_found -> []))
+       *   tr) *)
+      Automaton.TransitionMap.add key states_arr.(x) tr
+    ) f Automaton.TransitionMap.empty in
   let transitions = IntIntSet.fold (fun (x1, x2) tr ->
       let key = states_arr.(x1), IntMap.find x2 back in
-      Automaton.TransitionMap.add
-        key
-        (states_arr.(x2) ::
-         (try Automaton.TransitionMap.find key tr with Not_found -> []))
-        tr)
-      fac initial_transitions in
+      (* Automaton.TransitionMap.add
+       *   key
+       *   (states_arr.(x2) ::
+       *    (try Automaton.TransitionMap.find key tr with Not_found -> []))
+       *   tr) *)
+      Automaton.TransitionMap.add key states_arr.(x2) tr
+    ) fac initial_transitions in
   let initial = StringSet.singleton init in
   let final   = IntSet.fold (fun x s ->
       StringSet.add states_arr.(x) s) l StringSet.empty in
@@ -161,24 +143,30 @@ let compile_regexp init r =
     transitions = transitions
   } : Automaton.automaton)
 
-let clear states transitions =
+let clear (states : states) (transitions : TreeAutomaton.transitions) =
   let remove =
-    TreeAutomaton.TransitionMap.fold (fun k _ remove ->
+    TreeAutomaton.TransitionMap.fold_map (fun k _ remove ->
         StringSet.remove k remove) transitions (StringSet.remove "#" states) in
   let transitions' =
-    TreeAutomaton.TransitionMap.map (fun lst ->
-        List.filter (fun (_, qd, qr) ->
-            not (StringSet.mem qd remove || StringSet.mem qr remove)) lst) transitions in
-  let transitions'' =
-    TreeAutomaton.TransitionMap.filter (fun _ lst -> lst <> []) transitions' in
-  StringSet.diff states remove, transitions''
+    (* TreeAutomaton.TransitionMap.map (fun lst ->
+     *     List.filter (fun (_, qd, qr) ->
+     *         not (StringSet.mem qd remove || StringSet.mem qr remove)) lst) transitions in *)
+    TreeAutomaton.TransitionMap.filter (fun _ (_, qd, qr) ->
+        not (StringSet.mem qd remove || StringSet.mem qr remove)
+      ) transitions in
+  (* let transitions'' =
+   *   TreeAutomaton.TransitionMap.filter (fun _ lst -> lst <> []) transitions' in *)
+  (* StringSet.diff states remove, transitions'' *)
+  StringSet.diff states remove, transitions'
 
 let compile_types tlist init =
   let q, qmap, lmap = List.fold_left (fun (q, qmap, lmap) t ->
       let qt = "q" ^ t.id in
       let lt = compile_label t.label in
-      StringSet.add qt q, StringMap.add t.id qt qmap, StringMap.add t.id (lt :: (try StringMap.find t.id lmap with Not_found -> [])) lmap
-    ) (StringSet.empty, StringMap.empty, StringMap.empty) tlist in
+      (* StringSet.add qt q, StringMap.add t.id qt qmap, StringMap.add t.id (lt :: (try StringMap.find t.id lmap with Not_found -> [])) lmap *)
+      (* ) (StringSet.empty, StringMap.empty, StringMap.empty) tlist in *)
+      StringSet.add qt q, StringMap.add t.id qt qmap, StringListMap.add t.id lt lmap
+    ) (StringSet.empty, StringMap.empty, StringListMap.empty) tlist in
   let q, qmap = List.fold_left (fun (q, qmap) t ->
       let qt = StringMap.find t.id qmap in
       if t.regexp = Empty then
@@ -189,30 +177,39 @@ let compile_types tlist init =
   let q', tr = List.fold_left (fun (q, tr) t ->
       let a = compile_regexp (StringMap.find t.id qmap) t.regexp in
       let tr =
-        Automaton.TransitionMap.fold (fun (u, m) vl tr ->
-            List.fold_left (fun tr v ->
-                List.fold_left (fun tr (label : labelset) ->
+        (* Automaton.TransitionMap.fold (fun (u, m) vl tr ->
+         *     List.fold_left (fun tr v -> *)
+
+        Automaton.TransitionMap.fold (fun (u, m) v tr ->
+            (* List.fold_left (fun tr (label : labelset) -> *)
+            StringListMap.fold_key (fun label tr ->
                     let qt    = StringMap.find m qmap in
-                    let lst   =
-                      try TreeAutomaton.TransitionMap.find u tr with Not_found -> [] in
-                    TreeAutomaton.TransitionMap.add
+                    (* let lst   =
+                     *   try TreeAutomaton.TransitionMap.find u tr with Not_found -> [] in *)
+                    (* TreeAutomaton.TransitionMap.add
+                     *   u
+                     *   ((label, qt, v) ::
+                     *    if StringSet.mem v a.final then (label, qt, "#") :: lst
+                     *    else lst)
+                     *   tr *)
+                    TreeAutomaton.TransitionMap.add_list
                       u
                       ((label, qt, v) ::
-                       if StringSet.mem v a.final then (label, qt, "#") :: lst
-                       else lst)
+                       if StringSet.mem v a.final then [(label, qt, "#")] else [])
                       tr
-                  ) tr (StringMap.find m lmap)
-              ) tr vl
+              ) m lmap tr
+                  (* ) tr (StringListMap.find m lmap) *)
+              (* ) tr vl *)
           ) a.transitions tr in
       (StringSet.union a.states q, tr)
     ) (q, TreeAutomaton.TransitionMap.empty) tlist in
   let qinit = StringMap.find init qmap in
-  let linit = StringMap.find init lmap in
+  let linit = StringListMap.find init lmap in
   let states, transitions = clear q' tr in
   {
     states = StringSet.add "accept" (StringSet.add "#" states);
     initial = StringSet.singleton "accept";
     final = StringSet.empty;
     transitions =
-      TreeAutomaton.TransitionMap.add "accept" (List.map (fun label -> (label, qinit, "#")) linit) transitions
+      TreeAutomaton.TransitionMap.add_list "accept" (List.map (fun label -> (label, qinit, "#")) linit) transitions
   }
