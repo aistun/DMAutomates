@@ -91,8 +91,8 @@ let rec factors = function
   | LStar r  -> IntIntSet.union (factors r) (prod (last r) (first r))
   | LQMark r -> factors r
   | LConcat(r1, r2) -> IntIntSet.union (factors r1)
-                        (IntIntSet.union (factors r2)
-                           (prod (last r1) (first r2)))
+                         (IntIntSet.union (factors r2)
+                            (prod (last r1) (first r2)))
   | LAlt(r1, r2) -> IntIntSet.union (factors r1) (factors r2)
 
 let rec nb_states = function
@@ -118,20 +118,10 @@ let compile_regexp init r =
   let fac = factors lr in
   let initial_transitions = IntSet.fold (fun x tr ->
       let key = init, IntMap.find x back in
-      (* Automaton.TransitionMap.add
-       *   key
-       *   (states_arr.(x) ::
-       *    (try Automaton.TransitionMap.find key tr with Not_found -> []))
-       *   tr) *)
       ATr.add key states_arr.(x) tr
     ) f ATr.empty in
   let transitions = IntIntSet.fold (fun (x1, x2) tr ->
       let key = states_arr.(x1), IntMap.find x2 back in
-      (* Automaton.TransitionMap.add
-       *   key
-       *   (states_arr.(x2) ::
-       *    (try Automaton.TransitionMap.find key tr with Not_found -> []))
-       *   tr) *)
       ATr.add key states_arr.(x2) tr
     ) fac initial_transitions in
   let initial = StringSet.singleton init in
@@ -151,23 +141,15 @@ let clear states transitions =
     TreeATr.fold_map (fun k _ remove ->
         StringSet.remove k remove) transitions (StringSet.remove "#" states) in
   let transitions' =
-    (* TreeAutomaton.TransitionMap.map (fun lst ->
-     *     List.filter (fun (_, qd, qr) ->
-     *         not (StringSet.mem qd remove || StringSet.mem qr remove)) lst) transitions in *)
     TreeATr.filter (fun _ (_, qd, qr) ->
         not (StringSet.mem qd remove || StringSet.mem qr remove)
       ) transitions in
-  (* let transitions'' =
-   *   TreeAutomaton.TransitionMap.filter (fun _ lst -> lst <> []) transitions' in *)
-  (* StringSet.diff states remove, transitions'' *)
   StringSet.diff states remove, transitions'
 
 let compile_types tlist init =
   let q, qmap, lmap = List.fold_left (fun (q, qmap, lmap) t ->
       let qt = "q" ^ t.id in
       let lt = compile_label t.label in
-      (* StringSet.add qt q, StringMap.add t.id qt qmap, StringMap.add t.id (lt :: (try StringMap.find t.id lmap with Not_found -> [])) lmap *)
-      (* ) (StringSet.empty, StringMap.empty, StringMap.empty) tlist in *)
       StringSet.add qt q, StringMap.add t.id qt qmap, StringListMap.add t.id lt lmap
     ) (StringSet.empty, StringMap.empty, StringListMap.empty) tlist in
   let q, qmap = List.fold_left (fun (q, qmap) t ->
@@ -180,29 +162,15 @@ let compile_types tlist init =
   let q', tr = List.fold_left (fun (q, tr) t ->
       let a = compile_regexp (StringMap.find t.id qmap) t.regexp in
       let tr =
-        (* Automaton.TransitionMap.fold (fun (u, m) vl tr ->
-         *     List.fold_left (fun tr v -> *)
-
         ATr.fold (fun (u, m) v tr ->
-            (* List.fold_left (fun tr (label : labelset) -> *)
             StringListMap.fold_key (fun label tr ->
-                    let qt    = StringMap.find m qmap in
-                    (* let lst   =
-                     *   try TreeAutomaton.TransitionMap.find u tr with Not_found -> [] in *)
-                    (* TreeAutomaton.TransitionMap.add
-                     *   u
-                     *   ((label, qt, v) ::
-                     *    if StringSet.mem v a.final then (label, qt, "#") :: lst
-                     *    else lst)
-                     *   tr *)
-                    TreeATr.add_list
-                      u
-                      ((label, qt, v) ::
-                       if StringSet.mem v a.final then [(label, qt, "#")] else [])
-                      tr
+                let qt    = StringMap.find m qmap in
+                TreeATr.add_list
+                  u
+                  ((label, qt, v) ::
+                   if StringSet.mem v a.final then [(label, qt, "#")] else [])
+                  tr
               ) m lmap tr
-                  (* ) tr (StringListMap.find m lmap) *)
-              (* ) tr vl *)
           ) a.transitions tr in
       (StringSet.union a.states q, tr)
     ) (q, TreeATr.empty) tlist in
