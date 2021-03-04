@@ -29,11 +29,9 @@ let pp_string_set f s =
   else
     StringSet.iter (fun x -> fprintf f "%s " x) s
 
-let pp_transition_list indent q a f =
-  List.iter (fun x -> fprintf f "%s%s -%s-> %s\n" indent q a x)
-
 let pp_transition_map indent f =
-  TransitionMap.iter_map (fun (q, a) q'list -> fprintf f "%a" (pp_transition_list indent q a) q'list)
+  TransitionMap.iter (fun (q, a) x ->
+      fprintf f "%s%s -%s-> %s\n" indent q a x)
 
 let pp f a =
   let pps = pp_string_set in
