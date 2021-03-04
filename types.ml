@@ -1,6 +1,14 @@
+(** Différentes définitions de types liées aux types d'arbres définis dans les
+    fichiers *.typ .
+    Ainsi, que plusieurs modules utiles par la suite à différents endroits du
+    code.
+*)
+
 open Format
 open Utils
 
+(* Types des expressions régluières avec pour éléments atomiques des chaînes
+   de caractères. *)
 type regexp =
   | Empty
   | Atom   of string
@@ -9,6 +17,9 @@ type regexp =
   | Concat of regexp * regexp
   | Alt    of regexp * regexp
 
+(* Type semblable à regexp mais avec entier supplémentaire pour le constructeur
+   LAtom. Ce type sert à représenter l'expression régulière linéarisée dans
+   la construction de Glushkov. *)
 type linear_regexp =
   | LEmpty
   | LAtom   of string * int
@@ -17,23 +28,23 @@ type linear_regexp =
   | LConcat of linear_regexp * linear_regexp
   | LAlt    of linear_regexp * linear_regexp
 
+(* Étiquettes de type d'arbre. *)
 type label =
   | Ident of string
   | Any
   | AllBut of string list
 
+(* Type représentant une définition de type d'arbre telle qu'elle sera lu
+   par le parser depuis les fichiers *.typ . *)
 type type_def = {
   id:     string;
   label:  label;
   regexp: regexp
 }
 
+(* Quelques modules utiles. *)
 module StringSet = Set.Make(String)
 module StringMap = Map.Make(String)
-
-type alphabet = StringSet.t
-type state  = string
-type states = StringSet.t
 
 module IntSet = Set.Make(struct
     type t = int
@@ -56,6 +67,18 @@ end
 
 module IntIntSet = Set.Make(IntInt)
 module StringListMap = ListMap(String)
+
+(* Types communs liés aux automates de mots et automates d'arbres. *)
+type alphabet = StringSet.t
+type state  = string
+type states = StringSet.t
+
+(************************** PRETTY-PRINTERS ************************************)
+
+let pp_string_set f s =
+  if StringSet.cardinal s = 0 then fprintf f "{}"
+  else
+    StringSet.iter (fun x -> fprintf f "%s " x) s
 
 let rec pp_alt f = function
   | Alt(r1, r2) -> fprintf f "%a | %a" pp_alt r1 pp_alt r2

@@ -1,8 +1,19 @@
+(** Définition des automates d'arbres non déterministes où les étiquettes sont
+    des chaînes de caractères.
+
+    - Les états sont des chaînes de caractères.
+    - Les transitions sont des map qui associent à un état une liste de triplets
+      ensemble d'étiquettes * état du fils gauche * état du fils droit.
+      On utilise le module ListMap, qui se trouve dans le module Utils, pour
+      implémenter ces maps de listes.
+*)
+
 open Format
 open Types
 open Tree
 open Utils
 
+(* Ensemble d'étiquettes pour les transitions. *)
 type labelset =
   | Finite of alphabet
   | CoFinite of alphabet
@@ -20,10 +31,8 @@ type tree_automaton = {
   transitions: transitions
 }
 
-let pp_string_set f s =
-  if StringSet.cardinal s = 0 then fprintf f "{}"
-  else
-    StringSet.iter (fun x -> fprintf f "%s " x) s
+
+(************************** PRETTY-PRINTERS ************************************)
 
 let pp_transition_map indent f =
   TransitionMap.iter (fun q (label, q1, q2) ->
@@ -40,6 +49,10 @@ let pp f (a : tree_automaton) =
 \t Final : %a
 \t Transitions : @[%a@]" pps a.states pps a.initial pps a.final ppt a.transitions
 
+
+(*********** RECONNAISSANCE D'ARBRES PAR UN AUTOMATE D'ARBRE *******************)
+
+(* Validation Bottom-Up (non utilisée ici). *)
 let rec validate_bu (a : tree_automaton) (t : binary_tree_map) (p : string) =
   let tp = StringMap.find p t in
   if tp = "#" then StringSet.singleton "#"
@@ -58,6 +71,16 @@ let rec validate_bu (a : tree_automaton) (t : binary_tree_map) (p : string) =
               else r
       ) a.transitions StringSet.empty
 
+(* Validation Bottom-Up optimisée.
+   Arguments :
+   - a : un automate d'arbre
+   - t : un arbre binaire représenté par un map associant à chaque chemin une
+         étiquette
+   - p : un chemin
+   - c : un ensemble d'états candidats
+   Renvoie un sous-ensemble d'états r de c tel que tous les états de r acceptent
+   le sous-arbre de t enregicé en p.
+*)
 let rec validate_opt (a : tree_automaton) (t: binary_tree_map) (p : string) (c : states) =
   let tp = StringMap.find p t in
   if StringSet.is_empty c then StringSet.empty

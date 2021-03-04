@@ -26,6 +26,4 @@ rule lexer = parse
   | letters (letters|digits|'_')* as s { IDENT s }
   | eof { EOF }
   | _ { failwith "lexical error" }
-{
-  
-}
+{ }

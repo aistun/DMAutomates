@@ -1,19 +1,22 @@
 open Types
 open TreeAutomaton
 
+(* Redéfinitions de modules et types pour simplifier l'écriture du code
+   plus loin. *)
 module TreeATr = TreeAutomaton.TransitionMap
 module ATr = Automaton.TransitionMap
 
 type automaton = Automaton.automaton
 type tree_automaton = TreeAutomaton.tree_automaton
 
-let new_state, reset_state =
+(* Identifiant unique pour les états. *)
+let new_state =
   let n = ref 0 in
-  (fun () ->
+  fun () ->
     incr n;
-    string_of_int !n),
-  (fun () -> n := 0)
+    string_of_int !n
 
+(* Identifiant unique pour la linéarisation des expressions régulières. *)
 let new_int, reset_int =
   let n = ref 0 in
   (fun () ->
@@ -21,11 +24,14 @@ let new_int, reset_int =
     !n),
   (fun () -> n := 0)
 
+(* Compilation de la définition de l'étiquette d'un type vers un ensemble fini
+   ou co-fini d'étiquettes. *)
 let compile_label = function
   | Ident s  -> Finite (StringSet.singleton s)
   | Any      -> CoFinite StringSet.empty
   | AllBut l -> CoFinite (StringSet.of_list l)
 
+(* Linéarisation d'une expression régulière. *)
 let linear_regexp_of_regexp r =
   let rec aux back = function
     | Empty -> back, LEmpty
@@ -49,14 +55,15 @@ let linear_regexp_of_regexp r =
   reset_int ();
   aux IntMap.empty r
 
-(* Renvoie true si la regexp permet de reconnaître epsilon. *)
+(* Renvoie true si l'expression régulière permet de reconnaître epsilon. *)
 let rec recognize_epsilon = function
   | LQMark _ | LStar _ -> true
   | LConcat(r1, _) -> recognize_epsilon r1
   | LAlt(r1, r2) -> recognize_epsilon r1 || recognize_epsilon r2
   | _ -> false
 
-(* Premiers éléments atomiques possibles dans les mots reconnus par la regexp. *)
+(* Premiers éléments atomiques (= symboles = chaînes de caractères) possibles
+   dans les mots reconnus par l'expression régulière. *)
 let rec first = function
   | LEmpty      -> IntSet.empty
   | LAtom(_, i) -> IntSet.singleton i
@@ -67,7 +74,8 @@ let rec first = function
     else first r1
   | LAlt(r1, r2)    -> IntSet.union (first r1) (first r2)
 
-(* Derniers éléments atomiques possibles dans les mots reconnus par la regexp. *)
+(* Derniers éléments atomiques possibles dans les mots reconnus par
+   l'expression régulière. *)
 let rec last = function
   | LEmpty      -> IntSet.empty
   | LAtom(_, i) -> IntSet.singleton i
@@ -85,6 +93,7 @@ let prod s1 s2 =
           IntIntSet.add (x1, x2) s
         ) s2 s) s1 IntIntSet.empty
 
+(* Facteurs de longueur 2 dans les mots reconnus par une expression régulière. *)
 let rec factors = function
   | LEmpty   -> IntIntSet.empty
   | LAtom _  -> IntIntSet.empty
@@ -95,6 +104,9 @@ let rec factors = function
                             (prod (last r1) (first r2)))
   | LAlt(r1, r2) -> IntIntSet.union (factors r1) (factors r2)
 
+(* Nombre d'états dans l'automate construit par la construction de Glushkov à
+   partir de l'expression régulière. Il s'agit en fait du nombre d'éléments
+   atomiques dans l'expression régulière. *)
 let rec nb_states = function
   | LEmpty   -> 0
   | LAtom _  -> 1
@@ -103,11 +115,9 @@ let rec nb_states = function
   | LConcat(r1, r2)
   | LAlt(r1, r2)    -> nb_states r1 + nb_states r2
 
-(**
- * Construction du NFA correspondant à l'expression régulière r et ayant
- * pour unique état initial `init`.
- * J'utilise ici la constructon de Glushkov.
- *)
+(* Construction du NFA correspondant à l'expression régulière r et ayant
+   pour unique état initial `init`.
+   J'utilise ici la constructon de Glushkov. *)
 let compile_regexp init r =
   let back, lr = linear_regexp_of_regexp r in
   let n = nb_states lr in
@@ -136,7 +146,9 @@ let compile_regexp init r =
     transitions = transitions
   } : automaton)
 
+(* Supprime les états inaccessibles de l'automate d'arbre. *)
 let clear states transitions =
+  (* remove : l'ensemble des états inaccessibles, à supprimer *)
   let remove =
     TreeATr.fold_map (fun k _ remove ->
         StringSet.remove k remove) transitions (StringSet.remove "#" states) in
@@ -146,12 +158,23 @@ let clear states transitions =
       ) transitions in
   StringSet.diff states remove, transitions'
 
+(* Compile une liste de définitions de types en automate d'arbre. *)
 let compile_types tlist init =
+  (* Création d'états pour chaque type et compilation des étiquettes associées
+     à ces types.
+     q : l'ensemble des états, un pour chaque type
+     qmap : map qui associe à chaque nom de type son état
+     lmap : map qui associe à chaque nom de type l'ensemble des
+
+   TODO: - Commentaires à terminer.
+         - Bug à corriger : reconnaissance de toutes les étiquettes à n'importe
+                            quelle regexp du type : problème ! *)
   let q, qmap, lmap = List.fold_left (fun (q, qmap, lmap) t ->
       let qt = "q" ^ t.id in
       let lt = compile_label t.label in
       StringSet.add qt q, StringMap.add t.id qt qmap, StringListMap.add t.id lt lmap
     ) (StringSet.empty, StringMap.empty, StringListMap.empty) tlist in
+  (* Correction *)
   let q, qmap = List.fold_left (fun (q, qmap) t ->
       let qt = StringMap.find t.id qmap in
       if t.regexp = Empty then
