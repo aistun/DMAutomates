@@ -184,7 +184,28 @@ let compile_types tlist init =
       {id = qt; label = t.label; regexp = t.regexp} :: tlist'
     ) (StringSet.empty, StringListMap.empty, []) tlist in
   reset_state (); (* réinitialise le compteur des états *)
-  (* Correction *)
+  (* Difficile d'expliquer l'idée suivante ...
+     Avec un exemple on voit bien. Si on a les définitions de types suivantes :
+         type t = L [ f ]
+         type f = F [ ]
+     Alors, si on appelle ql l'état qui est atteint lorsqu'un ensemble d'arbres
+     satisfait la regexp de l. De même, on appelle qf l'état qui est atteint
+     lorsq'un ensemble d'arbres satisfait l'expression de f.
+     Comme f peut reconnaître le mot vide, la reconnaissance de l'arbre suivant
+              L
+             / \
+            F   #
+           / \
+          #   #
+     doit se faire ainsi :
+                     L <- état acceptant unique
+                    / \
+       état ql ->  F   # <- état q#
+                  / \
+     état q# ->  #   # <- état q#
+
+     on n'a donc pas d'état qf, ou plutôt l'état qf est en fait égal à q#.
+  *)
   let q, qlmap = List.fold_left (fun (q, qlmap) t ->
       StringListMap.fold_key (fun (qt, lt) (q, qlmap) ->
           if t.regexp = Empty then
@@ -193,6 +214,10 @@ let compile_types tlist init =
             (q, qlmap)
         ) t.id qlmap (q, qlmap)
     ) (q, qlmap) tlist in
+  (* On parcours maintenant chaque définition de types modifiés et on compile
+     les regexp, puis on utilise les automates ainsi constuits, qui
+     reconnaissent des mots composés d'identifiants, pour constuire les
+     transitions de l'automate d'arbre. *)
   let q', tr = List.fold_left (fun (q, tr) t ->
       let a = compile_regexp t.id t.regexp in
       let tr =
