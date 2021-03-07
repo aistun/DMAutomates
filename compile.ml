@@ -10,11 +10,12 @@ type automaton = Automaton.automaton
 type tree_automaton = TreeAutomaton.tree_automaton
 
 (* Identifiant unique pour les états. *)
-let new_state =
+let new_state, reset_state =
   let n = ref 0 in
-  fun () ->
+  (fun () ->
     incr n;
-    string_of_int !n
+    string_of_int !n),
+  (fun () -> n := 0)
 
 (* Identifiant unique pour la linéarisation des expressions régulières. *)
 let new_int, reset_int =
@@ -148,7 +149,7 @@ let compile_regexp init r =
 
 (* Supprime les états inaccessibles de l'automate d'arbre. *)
 let clear states transitions =
-  (* remove : l'ensemble des états inaccessibles, à supprimer *)
+  (* remove : l'ensemble des états inaccessibles donc à supprimer *)
   let remove =
     TreeATr.fold_map (fun k _ remove ->
         StringSet.remove k remove) transitions (StringSet.remove "#" states) in
@@ -163,49 +164,58 @@ let compile_types tlist init =
   (* Création d'états pour chaque type et compilation des étiquettes associées
      à ces types.
      q : l'ensemble des états, un pour chaque type
-     qmap : map qui associe à chaque nom de type son état
-     lmap : map qui associe à chaque nom de type l'ensemble des
-
-   TODO: - Commentaires à terminer.
-         - Bug à corriger : reconnaissance de toutes les étiquettes à n'importe
-                            quelle regexp du type : problème ! *)
-  let q, qmap, lmap = List.fold_left (fun (q, qmap, lmap) t ->
-      let qt = "q" ^ t.id in
+     qlmap  : map qui associe à chaque nom de type une liste composé d'états lui
+              correspondant associé à l'étiquette compilée.
+              En effet, si dans le fichier de types on a :
+                  type t = L[ f ]
+                  type t = N[ g ]
+              Alors, la liste associée à t dans qlmap est par exemple :
+                  [(ql1, Finite {f}); (ql2, Finite {g})]
+     tlist' : une version modifiée de tlist où on a changé les id des
+              définitions de types en des identifiants uniques correspondant
+              à des états.
+              Dans l'exemple précédent, l'id de la première définition de type
+              est changée à qt1 et l'id de la deuxième est changé à qt2) *)
+  let q, qlmap, tlist' = List.fold_left (fun (q, qlmap, tlist') t ->
+      let qt = "q" ^ t.id ^ new_state () in
       let lt = compile_label t.label in
-      StringSet.add qt q, StringMap.add t.id qt qmap, StringListMap.add t.id lt lmap
-    ) (StringSet.empty, StringMap.empty, StringListMap.empty) tlist in
+      StringSet.add qt q,
+      StringListMap.add t.id (qt, lt) qlmap,
+      {id = qt; label = t.label; regexp = t.regexp} :: tlist'
+    ) (StringSet.empty, StringListMap.empty, []) tlist in
+  reset_state (); (* réinitialise le compteur des états *)
   (* Correction *)
-  let q, qmap = List.fold_left (fun (q, qmap) t ->
-      let qt = StringMap.find t.id qmap in
-      if t.regexp = Empty then
-        (StringSet.remove qt q, StringMap.add t.id "#" qmap)
-      else
-        (q, qmap)
-    ) (q, qmap) tlist in
+  let q, qlmap = List.fold_left (fun (q, qlmap) t ->
+      StringListMap.fold_key (fun (qt, lt) (q, qlmap) ->
+          if t.regexp = Empty then
+            (StringSet.remove qt q, StringListMap.add t.id ("#", lt) qlmap)
+          else
+            (q, qlmap)
+        ) t.id qlmap (q, qlmap)
+    ) (q, qlmap) tlist in
   let q', tr = List.fold_left (fun (q, tr) t ->
-      let a = compile_regexp (StringMap.find t.id qmap) t.regexp in
+      let a = compile_regexp t.id t.regexp in
       let tr =
         ATr.fold (fun (u, m) v tr ->
-            StringListMap.fold_key (fun label tr ->
-                let qt    = StringMap.find m qmap in
+            StringListMap.fold_key (fun (qt, label) tr ->
                 TreeATr.add_list
                   u
                   ((label, qt, v) ::
                    if StringSet.mem v a.final then [(label, qt, "#")] else [])
                   tr
-              ) m lmap tr
+              ) m qlmap tr
           ) a.transitions tr in
       (StringSet.union a.states q, tr)
-    ) (q, TreeATr.empty) tlist in
-  let qinit = StringMap.find init qmap in
-  let linit = StringListMap.find init lmap in
+    ) (q, TreeATr.empty) tlist' in
+  let qlinit = StringListMap.find init qlmap in
   let states, transitions = clear q' tr in
+  let _ = init in
   {
     states = StringSet.add "accept" (StringSet.add "#" states);
     initial = StringSet.singleton "accept";
     final = StringSet.empty;
     transitions = TreeATr.add_list
         "accept"
-        (List.map (fun label -> (label, qinit, "#")) linit)
+        (List.map (fun (qi, label) -> (label, qi, "#")) qlinit)
         transitions
   }
