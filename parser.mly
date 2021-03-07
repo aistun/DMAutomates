@@ -25,19 +25,23 @@ label:
 | STAR                                    { Types.Any      }
 | TILDE; l = separated_list(TILDE, IDENT) { Types.AllBut l }
 
+(* J'utilise ici plusieurs états non-terminaux pour les priorités d'opérations
+   dans les expressions régulières : le | est moins fort que ?, * ou la
+   concaténation. *)
+
 regexp_base:
-| id = IDENT                 { Types.Atom id         }
-| r = regexp_base; STAR      { Types.Star r          }
-| r = regexp_base; QMARK     { Types.QMark r         }
+| id = IDENT                 { Types.Atom id }
+| r = regexp_base; STAR      { Types.Star r  }
+| r = regexp_base; QMARK     { Types.QMark r }
 | LPAR; r = regexp_alt; RPAR { r }
 ;
 
 regexp_concat:
 | r = regexp_base                      { r }
-| r1 = regexp_base; r2 = regexp_concat { Types.Concat(r1, r2)  }
+| r1 = regexp_base; r2 = regexp_concat { Types.Concat(r1, r2) }
 ;
 
 regexp_alt:
 | r = regexp_concat                        { r }
-| r1 = regexp_concat; ALT; r2 = regexp_alt { Types.Alt(r1, r2)     }
+| r1 = regexp_concat; ALT; r2 = regexp_alt { Types.Alt(r1, r2) }
 ;

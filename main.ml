@@ -1,10 +1,5 @@
-(*
-*)
-
 open Types
 open Format
-(* open Automaton
- * open TreeAutomaton *)
 open Compile
 open Tree
 
@@ -28,7 +23,7 @@ let () =
     printf "%a@." Tree.pp t;
     let tmap = map_of_binary_tree t in
     let r_bu = TreeAutomaton.validate_bu ta tmap "" in
-    printf "%a@." TreeAutomaton.pp_string_set r_bu;
+    printf "%a@." pp_string_set r_bu;
     let r_opt = TreeAutomaton.validate_opt ta tmap "" ta.initial in
-    printf "%a@." TreeAutomaton.pp_string_set r_opt
+    printf "%a@." pp_string_set r_opt
   end
