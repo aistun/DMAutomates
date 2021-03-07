@@ -1,3 +1,4 @@
+open Format
 open Types
 open TreeAutomaton
 
@@ -206,14 +207,14 @@ let compile_types tlist init =
 
      on n'a donc pas d'état qf, ou plutôt l'état qf est en fait égal à q#.
   *)
-  let q, qlmap = List.fold_left (fun (q, qlmap) t ->
-      StringListMap.fold_key (fun (qt, lt) (q, qlmap) ->
+  let qlmap = List.fold_left (fun qlmap t ->
+      StringListMap.fold_key (fun (_, lt) qlmap ->
           if t.regexp = Empty then
-            (StringSet.remove qt q, StringListMap.add t.id ("#", lt) qlmap)
+            StringListMap.add t.id ("#", lt) qlmap
           else
-            (q, qlmap)
-        ) t.id qlmap (q, qlmap)
-    ) (q, qlmap) tlist in
+            qlmap
+        ) t.id qlmap qlmap
+    ) qlmap tlist in
   (* On parcours maintenant chaque définition de types modifiés et on compile
      les regexp, puis on utilise les automates ainsi constuits, qui
      reconnaissent des mots composés d'identifiants, pour constuire les
@@ -232,15 +233,19 @@ let compile_types tlist init =
           ) a.transitions tr in
       (StringSet.union a.states q, tr)
     ) (q, TreeATr.empty) tlist' in
-  let qlinit = StringListMap.find init qlmap in
-  let states, transitions = clear q' tr in
+  let qlinit =
+    try StringListMap.find init qlmap
+    with Not_found ->
+      printf "Le nom de type spécifié pour la racine n'appartient pas à la définition de types.@.";
+      exit 1 in
+  let states = StringSet.add "accept" (StringSet.add "#" q') in
+  let transitions = TreeATr.add_list "accept"
+      (List.map (fun (qi, label) -> (label, qi, "#")) qlinit) tr in
+  let states, transitions = clear states transitions in
   let _ = init in
   {
-    states = StringSet.add "accept" (StringSet.add "#" states);
+    states = states;
     initial = StringSet.singleton "accept";
     final = StringSet.empty;
-    transitions = TreeATr.add_list
-        "accept"
-        (List.map (fun (qi, label) -> (label, qi, "#")) qlinit)
-        transitions
+    transitions = transitions
   }
