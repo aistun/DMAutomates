@@ -101,11 +101,13 @@ let rec validate_opt (a : tree_automaton) (t: binary_tree_map) (p : string) (c :
               (c', c1, c2)
         ) a.transitions (StringSet.empty, StringSet.empty, StringSet.empty) in
     let r1 = validate_opt a t (p ^ "1") c1 in
-    let r2 = validate_opt a t (p ^ "2") c2 in
-    if StringSet.is_empty r1 || StringSet.is_empty r2 then StringSet.empty
+    if StringSet.is_empty r1 then StringSet.empty
     else
-      TransitionMap.fold (fun q (_, q1, q2) r ->
-          if StringSet.mem q c' && StringSet.mem q1 r1 && StringSet.mem q2 r2 then
-            StringSet.add q r
-          else r
-        ) a.transitions StringSet.empty
+      let r2 = validate_opt a t (p ^ "2") c2 in
+      if StringSet.is_empty r2 then StringSet.empty
+      else
+        TransitionMap.fold (fun q (_, q1, q2) r ->
+            if StringSet.mem q c' && StringSet.mem q1 r1 && StringSet.mem q2 r2 then
+              StringSet.add q r
+            else r
+          ) a.transitions StringSet.empty
