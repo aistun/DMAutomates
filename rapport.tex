@@ -1,0 +1,354 @@
+\documentclass[a4paper, 11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage[margin=2.5cm]{geometry}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[french, onelanguage]{algorithm2e}
+\usepackage{graphicx}
+\usepackage{listings}
+
+\title{Automates et Applications : Rapport}
+\author{Josué Moreau}
+\date{8 Mars 2020}
+
+\SetKwProg{Fn}{fonction}{}{fin}
+\SetKwBlock{Init}{initialement}{fin}
+\SetKwFor{ForAll}{pour tout}{faire}{fin}
+\SetKwBlock{Pre}{précondition}{fin}
+\SetKwBlock{Post}{postcondition}{fin}
+\SetKwFor{ForEach}{pour chaque}{faire}{fin}
+
+\newcommand\et{\text{ et }}
+\newcommand\ou{\text{ ou }}
+
+\begin{document}
+
+%% Configuration pour les pseudo codes d'algorithmes
+% \RestyleAlgo{ruled}
+\SetAlgoVlined
+% \LinesNumbered
+\DontPrintSemicolon
+
+\maketitle
+
+\section*{2. Validation top-down non déterministe}
+
+\begin{enumerate}
+\item Un run d'un automate d'arbre $A = (Q, \Sigma, \delta, I, F)$ pour un arbre
+  $t \in \mathcal{T}(\Sigma)$ est une fonction $r : dom(t) \to Q$ telle que
+  $\forall p \in dom(t), (r(p1), ..., r(pk)) \in \delta(L, r(p))$ et
+  $t(p) \in L$, avec $|t(p)| = k$. Un run est dit acceptant si et seulement si
+  $r(\varepsilon) \in I$ et $\forall p \in dom(t), |t(p)| = 0 \to r(p) \in F$.
+\item \hfill\\
+  \begin{algorithm}[H]
+    \Fn{$\texttt{validate\_td}(A, t, p, q)$}{
+      \eIf{$t(p) = \#$}{
+        \Return $(t(p) \in A.F)$\;
+      }{
+        \ForEach{transition $(L, q', q_1, q_2)$ dans $A$}{
+          \If{$q = q' \et t(p) \in L$}{
+            \Return $\texttt{validate\_td}(A, t, \texttt{first-child}(p), q_1) \et$\\
+            \quad $\texttt{validate\_td}(A, t, \texttt{next-sibling}(p), q_2)$\;
+          }
+        }
+        \Return faux\;
+      }
+    }
+  \end{algorithm}
+\item
+  \begin{itemize}
+  \item La complexité de tester l'existence d'un $q$ dans $I$ qui
+    satisfait une certaine propriété se fait en temps $O(|I|)$.
+  \item Si l'on appelle $E$ le nombre d'étiquettes définies explicitement dans
+    le fichier de types de l'automate $A$ i.e. le nombre d'étiquettes dans les
+    ensembles $L$ finis et dans les complémentaires des ensembles $L$ co-finis.
+  \item La complexité de \texttt{validate\_td}$(A, t, \varepsilon, q)$ est en\\
+    $O(|A| \times (\log E \text{ } + \text{ complexité des appels récursifs}))$.
+    Ainsi, la complexité de l'expression
+    \texttt{validate\_td}$(A, t, \varepsilon, q)$ est
+    $\underbrace{|A| \times ... \times |A|}_{\max_{p \in dom(t)} |p|}$ où $|p|$
+    est la longueur du chemin $p$. Le pire des cas est celui où l'arbre a une
+    forme filaire, dans ce cas $\max_{p \in dom(t)} |p| = |t|$ (si l'on ne
+    compte les noeuds vides).
+  \item Donc, la complexité de l'expression
+    $\exists q \in I, \texttt{validate\_td}(A, t, p, q)$ est en
+    $O(|I||A|^{|t|})$.
+  \end{itemize}
+\end{enumerate}
+
+\section*{3. Validation bottom-up}
+
+\begin{enumerate}
+\item \hfill\\
+  \begingroup
+  \LinesNumbered
+  \begin{algorithm}[H]
+    \Fn{$\texttt{validate\_bu}(A, t, p)$}{
+      \eIf{$t(p) = \#$}{
+        $R \leftarrow \emptyset$\;
+        \ForEach{transition $(L, q, \_, \_)$ dans $A$}{
+          \If{$\# \in L$}{
+            ajouter $q$ à $R$\;
+          }
+        }
+        \Return $R$\;
+      }{
+        $R_1 \leftarrow \texttt{validate\_bu}(A, t, \texttt{first-child}(p))$\;
+        $R_2 \leftarrow \texttt{validate\_bu}(A, t, \texttt{next-sibling}(p))$\;
+        $R \leftarrow \emptyset$\;
+        \ForEach{transition $(L, q, q_1, q_2)$ dans $A$}{
+          \If{$q_1 \in R_1 \et q_2 \in R_2 \et t(p) \in L$}{
+            ajouter $q$ à $R$\;
+          }
+        }
+        \Return $R$\;
+      }
+    }
+  \end{algorithm}
+  \endgroup
+\item
+  \begin{itemize}
+  \item Avec les appels récursifs, les calculs des lignes 11 à 15 sont exécutés pour
+    chaque noeud de l'arbre $t$, donc exactement $|t|$ fois (on ne compte pas
+    dans $|t|$ les noeuds vides).
+  \item À chaque fois, les calculs des lignes 11 à 15 se font en temps
+    $O(\log E \times (|R_1| + |R_2|))$.
+  \item Or, $|R_1| = O(|A|)$ et $|R_2| = O(|A|)$ car ils sont construits de
+    telle manière que pour chaque transition de $A$ on ajoute au plus un élément
+    dans $R_1$ (idem pour $R_2$).
+  \item Donc, la complexité totale de l'expression
+    $\texttt{validate\_bu}(A, t, \varepsilon)$ est en
+    $O(|t| \times |A| \times \log E)$.
+  \item Le calcul de l'intersection
+    $\texttt{validate\_bu}(A, t, \varepsilon) \cap I$ se fait en temps\\
+    $O(|\texttt{validate\_bu}(A, t, \varepsilon)| \times I) = O(|A|)$ (en
+    supposant qu'il existe un ordre sur les états).
+  \item Ainsi, la complexité de l'expression
+    $\texttt{validate\_bu}(A, t, \varepsilon) \cap I$ est en
+    $O(|t| \times |A| \times \log E)$.
+  \end{itemize}
+\item \hfill\\
+  \begingroup
+  \LinesNumbered
+  \begin{algorithm}[H]
+    \Fn{$\texttt{validate\_opt}(A, t, p, P)$}{
+      \uIf{$P = \emptyset$}{
+        \Return $\emptyset$\;
+      }
+      \uElseIf{$t(p) = \#$}{
+        $R \leftarrow \emptyset$\;
+        \ForEach{transition $(L, q, \_, \_)$ dans $A$}{
+          \If{$\# \in L$}{
+            ajouter $q$ à $R$\;
+          }
+        }
+        \Return $R$\;
+      }
+      \Else{
+        $P' \leftarrow \emptyset$\;
+        $P_1 \leftarrow \emptyset$\;
+        $P_2 \leftarrow \emptyset$\;
+        \ForEach{transition $(L, q, q_1, q_2)$ dans $A$}{
+          \If{$q \in P \et t(p) \in L$}{
+            ajouter $q$ à $P'$\;
+            ajouter $q_1$ à $P_1$\;
+            ajouter $q_2$ à $P_2$\;
+          }
+        }
+        $R_1 \leftarrow \texttt{validate\_opt}(A, t, \texttt{first-child}(p))$\;
+        $R_2 \leftarrow \texttt{validate\_opt}(A, t, \texttt{next-sibling}(p))$\;
+        \If{$R_1 = \emptyset \ou R_2 = \emptyset$}{
+          \Return $\emptyset$\;
+        }
+
+        $R \leftarrow \emptyset$\;
+        \ForEach{transition $(L, q, q_1, q_2)$ dans $A$}{
+          \If{$q \in P' \et q_1 \in R_1 \et q_2 \in R_2$}{
+            ajouter $q$ à $R$\;
+          }
+        }
+        \Return $R$\;
+      }
+    }
+  \end{algorithm}
+  \endgroup
+\end{enumerate}
+
+\section*{4. Compilation}
+
+\subsection*{Compilation des étiquettes}
+
+\begin{algorithm}[H]
+  \Fn{$\texttt{compile\_label}(l)$}{
+    \uIf{$l$ est un mot $m$}{
+      \Return $\{m\}$\;
+    }
+    \uElseIf{$l$ est $*$}{
+      \Return $\Sigma \setminus \emptyset$\;
+    }
+    \Else{
+      // $l$ est de la forme $\sim l_1 \sim ... \sim l_n$\;
+      \Return $\Sigma \setminus \{l_1, ..., l_n\}$\;
+    }
+  }
+\end{algorithm}
+
+\subsection*{Arbres XML $\rightarrow$ Arbres binaires}
+
+Il est possible de représenter des arbres XML avec des arbres binaires.
+En effet, considérons le fichier XML suivant :
+\\\texttt{<L1>}
+\\\null\quad \texttt{<F1></F1>}
+\\\null\quad \texttt{<L2>}
+\\\null\qquad \texttt{<F2></F2>}
+\\\null\qquad \texttt{<L3>}
+\\\null\qquad\quad \texttt{<F3></F3>}
+\\\null\qquad\quad \texttt{<F4></F4>}
+\\\null\qquad \texttt{</L3>}
+\\\null\qquad \texttt{<F5></F5>}
+\\\null\quad \texttt{</L2>}
+\\\texttt{</L1>}
+
+L'arbre correspondant à ce fichier XML est le suivant :\\
+\begin{center}
+  \includegraphics{figure-1}
+\end{center}
+
+On peut alors rajouter des $\#$ et les liens rouges, qui lient un noeud et son
+premier fils, ainsi qu'un noeud et son premier frère de droite. On obtient
+alors :\\
+\begin{center}
+  \includegraphics{figure-2}
+\end{center}
+
+En extrayant enfin l'arbre rouge, on obtient l'arbre binaire suivant :\\
+\begin{center}
+  \includegraphics{figure-3}
+\end{center}
+
+\subsection*{Compilation des types}
+
+Pour compiler les types, on a déjà défini la fonction \texttt{compile\_label}
+qui compile une étiquette d'une définition de type. Il faut maintenant compiler
+l'expression régulière de la définition de type. Pour cela, on va considérer que
+l'expression régulière est une expression régulière telle qu'on les a considéré
+pour les langages rationnels mais avec comme ensemble de symboles les
+identifiants des types. Il est alors possible de compiler cette expression
+régulière en un automate fini non-déterministe $\mathcal{A}_r$ avec la
+construction de Glushkov. On pourra ensuite se servir de cet automate
+$\mathcal{A}_r$ pour construire les transitions correspondant à la définition de
+type dont on a construit l'automate pour la regexp.
+
+On défini $q_\#$ un état spécial qui ne doit se trouver que sur un feuille vide
+$\#$. On va considérer que tout noeud vide peut passer à l'état $q_\#$ et que
+c'est le seul état dans lequel un noeud vide peut passer. Cette simplification
+n'a aucune incidence sur la reconnaissance d'arbre par l'automate.
+
+Tout d'abord, pour chaque définition de types \texttt{type} $a$ \texttt{=} $l_a$
+\texttt{[ ... ]} on compile son étiquette et on crée un état associé à cette
+définition. Cet état sera égal à $q_\#$ lorsque l'expression régulière de la
+définition de type est vide, sinon il sera différent de tous les autres états. À
+noter que comme il peut y avoir plusieurs définitions de types pour un même
+type, un même type correspond donc à autant d'étiquettes compilées et d'états.
+
+L'idée derrière ces états associés aux définitions de types est qu'ils vont
+servir représenter le fait qu'un sous-arbre est reconnue par l'expression
+régulière de la définition de type associé.
+
+Ensuite pour chaque définition de type, on construit l'automate fini
+$\mathcal{A}_r$ correspondant à l'expression régulière $r$ associée à la
+définition de type. Cet automate aura pour unique état initial l'état associé à
+la définition du type.
+
+Puis, pour chaque transition $q \xrightarrow{a} q'$ dans $\mathcal{A}_r$ où $a$
+est un identifiant de type, on va ajouter la transition $(L_a, q, q_a, q')$ pour
+tout $L_a$ et $q_a$ associées au type $a$. On ajoute également la transition
+$(L_A, q, q_a, q_\#)$ pour tout $L_a$ et $q_a$ associés au type $a$ si $q'$ est
+un état final dans l'automate $\mathcal{A}_r$.
+
+L'ensemble des états est ceux créés précédemment pour chaque définition de types
+ainsi que tous les états créés lors des automates finis associés aux expressions
+régulières. On rajoute enfin un dernier état, $accept$ et on rajoute les
+transitions $(L_a, accept, q_a, q_\#)$ à pour $L_a$ et $q_a$ associés au type de
+la racine.
+
+Avec cette construction, plusieurs états peuvent être ajoutés ainsi dans
+l'automate d'arbre mais sans aucune possibilité de les avoir un jour sur un
+noeud. On pourra alors les supprimer, ainsi que toutes les transitions dans
+lesquels ils figurent.
+
+On a donc le pseudo-code suivant :
+
+\begin{algorithm}[H]
+  \Fn{$\texttt{compile\_types}(\texttt{types\_defs}, t_{\text{initial}})$}{
+    $Q \leftarrow \emptyset$\;
+    $T \leftarrow \emptyset$\;
+    \ForEach{définition de type $tdef$ : \texttt{type} $t$ \texttt{=} $l$ \texttt{[} $r$ \texttt{]}}{
+      créer un nouvel état $q_{tdef}$\;
+      \If{$r = \emptyset$}{
+        $q_{tdef} \leftarrow q_\#$\;
+      }
+      $l_{tdef} \leftarrow \texttt{compile\_label}(l)$\;
+    }
+    \ForEach{définition de type $tdef$ : \texttt{type} $t$ \texttt{=} $l$ \texttt{[} $r$ \texttt{]}}{
+      $(Q_{tdef}, F_{tdef}, T_{tdef}) \leftarrow$ NFA (par la construction de Glushkov) pour l'expression
+      régulière $r$ avec $q_{tdef}$ comme unique état initial\;
+      $Q \leftarrow Q \cup Q_{tdef}$\;
+      \ForEach{transition $q \xrightarrow{a} q'$ dans $T_{tdef}$}{
+        ajouter $(l_{tdef}, q, q_{tdef}, q')$ à $T$\;
+        \If{$q' \in F_{tdef}$}{
+          ajouter $(l_{tdef}, q, q_{tdef}, q_\#)$ à $T$\;
+        }
+      }
+      \If{$t = t_{\text{initial}}$}{
+        ajouter $(l_{tdef}, accept, q_{tdef}, q_\#)$ à $T$\;
+      }
+    }
+
+    \Return $(Q, T, {accept})$\;
+  }
+\end{algorithm}
+
+\subsection*{Taille de l'automate d'arbre}
+
+\begin{itemize}
+\item Soit une étiquette $l$. Si $l$ est un mot $m$, alors on défini sa taille
+  comme égale est 1, si $l = *$, alors on défini sa taille comme égale à 1, si
+  $l = \sim l_1 \sim ... \sim l_n$, alors on défini la taille de $l$ comme égale
+  à $n$. On remarque que cette taille est aussi celle associée à une étiquette
+  compilée au vu de l'algorithme \texttt{compile\_label}. Cette taille est
+  inférieure ou égale à $E$ où $E$ est le nombre d'étiquettes définies
+  explicitement dans le fichier de type.
+\item On défini ensuite inductivement la taille d'une expression régulière $r$ :
+  \begin{itemize}
+  \item Si $r = t$ où $t$ est un type, alors $|r| = 1$
+  \item Si $r = r_1^*$, alors $|r| = 1 + |r_1|$
+  \item Si $r = r_1?$, alors $|r| = 1 + |r_1|$
+  \item Si $r = r_1r_2$, alors $|r| = |r_1| + |r_2|$
+  \item Si $r = r_1 | r_2$, alors $|r| = |r_1| + |r_2|$
+  \end{itemize}
+\item On peut ensuite définir la taille d'une définition de type $tdef$ :
+  \texttt{type} $t$ \texttt{=} $l$ \texttt{[} $r$ \texttt{]}.
+  $|tdef| = |l| + |r|$.
+\item De plus, la construction de Glushkov construit un état pour chaque facteur
+  de longueur 2, et qu'il y a au plus $K^2$ facteurs de longueur 2, où $K$ est
+  le nombre de types (sans compter deux fois un même type) définis dans le
+  fichier de types. On en déduit que pour chaque définition de type on ajoute au
+  plus $K^2$ transitions.
+\item On ajoute également transitions de $accept$ vers les états associés au
+  type initial, il y en a au plus $N$ où $N$ est le nombre de définitions de
+  types.
+\item On a donc un automate de taille
+  $O(E \times (N + N \times K^2)) = O(ENK^2)$ car $K \geq 1$. La taille de
+  l'automate est donc $O(EN^3)$ car $K \leq N$ (le nombre de types définis (sans
+  compter deux fois un même type) est inférieur ou égal au nombre de définitions
+  de types).
+\end{itemize}
+
+
+\end{document}
+% LocalWords:  identifiants inductivement

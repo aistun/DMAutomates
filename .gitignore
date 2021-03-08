@@ -1,2 +1,9 @@
 _build
 aa_m1_mpri_devoir.pdf
+*.mps
+
+*.aux
+
+*.log
+
+*.pdf
