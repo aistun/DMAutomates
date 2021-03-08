@@ -181,40 +181,13 @@ let compile_types tlist init =
       let qt = "q" ^ t.id ^ new_state () in
       let lt = compile_label t.label in
       StringSet.add qt q,
-      StringListMap.add t.id (qt, lt) qlmap,
+      (* Dans le cas où l'expression régulière de la définition de type
+         est vide, on ajoute q# (noté # ici) au lieu de l'état qt *)
+      (if t.regexp = Empty then StringListMap.add t.id ("#", lt) qlmap
+       else StringListMap.add t.id (qt, lt) qlmap),
       {id = qt; label = t.label; regexp = t.regexp} :: tlist'
     ) (StringSet.empty, StringListMap.empty, []) tlist in
   reset_state (); (* réinitialise le compteur des états *)
-  (* Difficile d'expliquer l'idée suivante ...
-     Avec un exemple on voit bien. Si on a les définitions de types suivantes :
-         type t = L [ f ]
-         type f = F [ ]
-     Alors, si on appelle ql l'état qui est atteint lorsqu'un ensemble d'arbres
-     satisfait la regexp de l. De même, on appelle qf l'état qui est atteint
-     lorsq'un ensemble d'arbres satisfait l'expression de f.
-     Comme f peut reconnaître le mot vide, la reconnaissance de l'arbre suivant
-              L
-             / \
-            F   #
-           / \
-          #   #
-     doit se faire ainsi :
-                     L <- état acceptant unique
-                    / \
-       état ql ->  F   # <- état q#
-                  / \
-     état q# ->  #   # <- état q#
-
-     on n'a donc pas d'état qf, ou plutôt l'état qf est en fait égal à q#.
-  *)
-  let qlmap = List.fold_left (fun qlmap t ->
-      StringListMap.fold_key (fun (_, lt) qlmap ->
-          if t.regexp = Empty then
-            StringListMap.add t.id ("#", lt) qlmap
-          else
-            qlmap
-        ) t.id qlmap qlmap
-    ) qlmap tlist in
   (* On parcours maintenant chaque définition de types modifiés et on compile
      les regexp, puis on utilise les automates ainsi constuits, qui
      reconnaissent des mots composés d'identifiants, pour constuire les
