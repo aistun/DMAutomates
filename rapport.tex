@@ -112,9 +112,9 @@
   \endgroup
 \item
   \begin{itemize}
-  \item Avec les appels récursifs, les calculs des lignes 11 à 15 sont exécutés pour
-    chaque noeud de l'arbre $t$, donc exactement $|t|$ fois (on ne compte pas
-    dans $|t|$ les noeuds vides).
+  \item Avec les appels récursifs, les calculs des lignes 11 à 15 sont exécutés
+    exactement une fois pour chaque noeud de l'arbre $t$, donc exactement $|t|$
+    fois (on ne compte pas dans $|t|$ les noeuds vides).
   \item À chaque fois, les calculs des lignes 11 à 15 se font en temps
     $O(\log E \times (|R_1| + |R_2|))$.
   \item Or, $|R_1| = O(|A|)$ et $|R_2| = O(|A|)$ car ils sont construits de
@@ -159,9 +159,12 @@
             ajouter $q_2$ à $P_2$\;
           }
         }
-        $R_1 \leftarrow \texttt{validate\_opt}(A, t, \texttt{first-child}(p))$\;
-        $R_2 \leftarrow \texttt{validate\_opt}(A, t, \texttt{next-sibling}(p))$\;
-        \If{$R_1 = \emptyset \ou R_2 = \emptyset$}{
+        $R_1 \leftarrow \texttt{validate\_opt}(A, t, \texttt{first-child}(p), P_1)$\;
+        \If{$R_1 = \emptyset$}{
+          \Return $\emptyset$\;
+        }
+        $R_2 \leftarrow \texttt{validate\_opt}(A, t, \texttt{next-sibling}(p), P_2)$\;
+        \If{$R_2 = \emptyset$}{
           \Return $\emptyset$\;
         }
 
@@ -176,6 +179,11 @@
     }
   \end{algorithm}
   \endgroup
+
+  Si $P$ est vide, alors la fonction doit immédiatement rendre $\emptyset$. Si
+  $R$ est vide, dans le cas où il provient d'un appel récursif (il s'agit donc
+  d'un $R_1$ ou $R_2$) alors nécessairement $|R| = 0$, donc on fait remonter ce
+  résultat sans faire aucun calculs.
 \end{enumerate}
 
 \section*{4. Compilation}
@@ -253,7 +261,7 @@ Tout d'abord, pour chaque définition de types \texttt{type} $a$ \texttt{=} $l_a
 définition. Cet état sera égal à $q_\#$ lorsque l'expression régulière de la
 définition de type est vide, sinon il sera différent de tous les autres états. À
 noter que comme il peut y avoir plusieurs définitions de types pour un même
-type, un même type correspond donc à autant d'étiquettes compilées et d'états.
+type, un même type correspond à autant d'étiquettes compilées et d'états.
 
 L'idée derrière ces états associés aux définitions de types est qu'ils vont
 servir représenter le fait qu'un sous-arbre est reconnue par l'expression
@@ -292,16 +300,18 @@ On a donc le pseudo-code suivant :
       \If{$r = \emptyset$}{
         $q_{tdef} \leftarrow q_\#$\;
       }
-      $l_{tdef} \leftarrow \texttt{compile\_label}(l)$\;
+      $L_{tdef} \leftarrow \texttt{compile\_label}(l)$\;
     }
     \ForEach{définition de type $tdef$ : \texttt{type} $t$ \texttt{=} $l$ \texttt{[} $r$ \texttt{]}}{
       $(Q_{tdef}, F_{tdef}, T_{tdef}) \leftarrow$ NFA (par la construction de Glushkov) pour l'expression
       régulière $r$ avec $q_{tdef}$ comme unique état initial\;
       $Q \leftarrow Q \cup Q_{tdef}$\;
       \ForEach{transition $q \xrightarrow{a} q'$ dans $T_{tdef}$}{
-        ajouter $(l_{tdef}, q, q_{tdef}, q')$ à $T$\;
-        \If{$q' \in F_{tdef}$}{
-          ajouter $(l_{tdef}, q, q_{tdef}, q_\#)$ à $T$\;
+        \ForEach{$(q_a, L_a)$ associés au type $a$}{
+          ajouter $(L_{a}, q, q_{a}, q')$ à $T$\;
+          \If{$q' \in F_{tdef}$}{
+            ajouter $(L_{a}, q, q_{a}, q_\#)$ à $T$\;
+          }
         }
       }
       \If{$t = t_{\text{initial}}$}{
@@ -337,14 +347,20 @@ On a donc le pseudo-code suivant :
 \item De plus, la construction de Glushkov construit un état pour chaque facteur
   de longueur 2, et qu'il y a au plus $K^2$ facteurs de longueur 2, où $K$ est
   le nombre de types (sans compter deux fois un même type) définis dans le
-  fichier de types. On en déduit que pour chaque définition de type on ajoute au
-  plus $K^2$ transitions.
+  fichier de types. Si on appelle maintenant $N$ le nombre de définitions de
+  types dans le fichier (cette fois en comptant donc autant de fois un type
+  qu'il y a de définitions associées à lui), on déduit alors qu'on ajoute au
+  plus $O(NK^2)$ transitions à l'automate d'arbre que l'on est en train de
+  construire. En effet, pour chaque transition de $\mathcal{A}_r$, il faut
+  ajouter autant de transitions dans l'automate d'arbre qu'il y a de couples
+  $(q_a, L_a)$, tels que définis précédemment, associés au type $a$, qui est
+  l'étiquette de la transition de $\mathcal{A}_r$.
 \item On ajoute également transitions de $accept$ vers les états associés au
   type initial, il y en a au plus $N$ où $N$ est le nombre de définitions de
   types.
 \item On a donc un automate de taille
-  $O(E \times (N + N \times K^2)) = O(ENK^2)$ car $K \geq 1$. La taille de
-  l'automate est donc $O(EN^3)$ car $K \leq N$ (le nombre de types définis (sans
+  $O(E \times (N + N^2 \times K^2)) = O(EN^2K^2)$ car $K \geq 1$. La taille de
+  l'automate est donc $O(EN^4)$ car $K \leq N$ (le nombre de types définis (sans
   compter deux fois un même type) est inférieur ou égal au nombre de définitions
   de types).
 \end{itemize}
